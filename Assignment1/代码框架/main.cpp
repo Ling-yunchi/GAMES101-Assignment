@@ -50,6 +50,11 @@ Eigen::Matrix4f get_projection_matrix(float eye_fov, float aspect_ratio,
 	projection(3, 2) = 1;
 	projection(2, 2) = zNear + zFar;
 	projection(2, 3) = -zNear * zFar;
+    	projection <<
+		n, 0, 0, 0,
+		0, n, 0, 0,
+		0, 0, f + n, -f * n,
+		0, 0, 1, 0;
 
 	float angel = eye_fov / 2;
 	float z = zFar - zNear;
