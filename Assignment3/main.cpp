@@ -50,7 +50,37 @@ Eigen::Matrix4f get_model_matrix(float angle)
 Eigen::Matrix4f get_projection_matrix(float eye_fov, float aspect_ratio, float zNear, float zFar)
 {
 	// TODO: Use the same projection matrix from the previous assignments
-	return Eigen::Matrix4f::Identity();
+	Eigen::Matrix4f projection = Eigen::Matrix4f::Identity();
+
+	projection <<
+		zNear, 0, 0, 0,
+		0, zNear, 0, 0,
+		0, 0, zFar + zNear, -zFar * zNear,
+		0, 0, 1, 0;
+
+	float halve = eye_fov / 2 * MY_PI / 180;
+	float top = -zNear * std::tan(halve);
+	float bottom = -top;
+
+	float right = top * aspect_ratio;
+	float left = -right;
+
+	Eigen::Matrix4f m, s;
+	m <<
+		1, 0, 0, -(left + right) / 2,
+		0, 1, 0, -(top + bottom) / 2,
+		0, 0, 1, -(zNear + zFar) / 2,
+		0, 0, 0, 1;
+
+	s <<
+		2 / (right - left), 0, 0, 0,
+		0, 2 / (top - bottom), 0, 0,
+		0, 0, 2 / (zNear - zFar), 0,
+		0, 0, 0, 1;
+
+	projection = s * m * projection;
+
+	return projection;
 }
 
 Eigen::Vector3f vertex_shader(const vertex_shader_payload& payload)
@@ -247,10 +277,10 @@ int main(int argc, const char** argv)
 
 	std::string filename = "output.png";
 	objl::Loader Loader;
-	std::string obj_path = "../models/spot/";
+	std::string obj_path = "./models/spot/";
 
 	// Load .obj File
-	bool loadout = Loader.LoadFile("../models/spot/spot_triangulated_good.obj");
+	bool loadout = Loader.LoadFile("./models/spot/spot_triangulated_good.obj");
 	for (auto mesh : Loader.LoadedMeshes)
 	{
 		for (int i = 0; i < mesh.Vertices.size(); i += 3)
@@ -271,7 +301,7 @@ int main(int argc, const char** argv)
 	auto texture_path = "hmap.jpg";
 	r.set_texture(Texture(obj_path + texture_path));
 
-	std::function<Eigen::Vector3f(fragment_shader_payload)> active_shader = phong_fragment_shader;
+	std::function<Eigen::Vector3f(fragment_shader_payload)> active_shader = normal_fragment_shader;
 
 	if (argc >= 2)
 	{
