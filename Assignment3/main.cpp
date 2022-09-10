@@ -168,13 +168,26 @@ Eigen::Vector3f phong_fragment_shader(const fragment_shader_payload& payload)
 	Eigen::Vector3f normal = payload.normal;
 
 	Eigen::Vector3f result_color = { 0, 0, 0 };
+
 	for (auto& light : lights)
 	{
 		// TODO: For each light source in the code, calculate what the *ambient*, *diffuse*, and *specular* 
 		// components are. Then, accumulate that result on the *result_color* object.
 
+		auto l = (light.position - point).normalized();
+		auto v = (eye_pos - point).normalized();
+		auto h = (l + v).normalized();
+		auto rr = (light.position - point).dot(light.position - point);
+
+		auto la = ka.cwiseProduct(amb_light_intensity);
+		auto ls = ks.cwiseProduct(light.intensity) / rr * pow(std::max(0.f, normal.dot(h)), p);
+		auto ld = kd.cwiseProduct(light.intensity)/ rr * std::max(0.0f, normal.dot(l));
+
+		auto L = la + ls + ld;
+		result_color += L;
 	}
 
+	//std::cout << result_color.transpose() * 255.f << std::endl;
 	return result_color * 255.f;
 }
 
@@ -301,7 +314,7 @@ int main(int argc, const char** argv)
 	auto texture_path = "hmap.jpg";
 	r.set_texture(Texture(obj_path + texture_path));
 
-	std::function<Eigen::Vector3f(fragment_shader_payload)> active_shader = normal_fragment_shader;
+	std::function<Eigen::Vector3f(fragment_shader_payload)> active_shader = phong_fragment_shader;
 
 	if (argc >= 2)
 	{

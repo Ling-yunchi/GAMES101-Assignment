@@ -299,20 +299,20 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t, const std::array<Eig
 				zp *= Z;
 
 				if (zp < depth_buf[width * x + y]) {
-					depth_buf[height * x + y] = zp;
+					depth_buf[width * x + y] = zp;
 
-					auto interpolated_color = t.color[0] * alpha + t.color[1] * beta + t.color[2] * gamma;
-					auto interpolated_normal = t.normal[0] * alpha + t.normal[1] * beta + t.normal[2] * gamma;
-					auto interpolated_texcoords = t.tex_coords[0] * alpha + t.tex_coords[1] * beta + t.tex_coords[2] * gamma;
-					auto interpolated_shadingcoord = t.v[0] * alpha + t.v[1] * beta + t.v[2] * gamma;
-					auto interpolated_shadingcoords = Vector3f(interpolated_shadingcoord.x(), interpolated_shadingcoord.y(), interpolated_shadingcoord.z());
+					//std::cout << t.color[0].transpose()<<" " << t.color[1].transpose() <<" " << t.color[2].transpose() << std::endl;
+					auto interpolated_color = interpolate(alpha, beta, gamma, t.color[0], t.color[1], t.color[2], 1);
+					auto interpolated_normal = interpolate(alpha, beta, gamma, t.normal[0], t.normal[1], t.normal[2], 1).normalized();
+					auto interpolated_texcoords = interpolate(alpha, beta, gamma, t.tex_coords[0], t.tex_coords[1], t.tex_coords[2], 1);
+					// view_pos[]是三角形顶点在view space中的坐标, 插值是为了还原在camera space中的坐标
+					auto interpolated_shadingcoords = interpolate(alpha, beta, gamma, view_pos[0], view_pos[1], view_pos[2], 1);
 
 					fragment_shader_payload payload(interpolated_color, interpolated_normal.normalized(), interpolated_texcoords, texture ? &*texture : nullptr);
 					payload.view_pos = interpolated_shadingcoords;
 
 					auto pixel_color = fragment_shader(payload);
-					Eigen::Vector2i point = Eigen::Vector2i(x, y);
-					set_pixel(point, pixel_color);
+					set_pixel(Eigen::Vector2i(x, y), pixel_color);
 				}
 			}
 		}
