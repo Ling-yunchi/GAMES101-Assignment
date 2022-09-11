@@ -114,7 +114,7 @@ Eigen::Vector3f texture_fragment_shader(const fragment_shader_payload& payload)
 	if (payload.texture)
 	{
 		// TODO: Get the texture value at the texture coordinates of the current fragment
-
+		return_color = payload.texture->getColor(payload.tex_coords[0], payload.tex_coords[1]);
 	}
 	Eigen::Vector3f texture_color;
 	texture_color << return_color.x(), return_color.y(), return_color.z();
@@ -143,6 +143,17 @@ Eigen::Vector3f texture_fragment_shader(const fragment_shader_payload& payload)
 		// TODO: For each light source in the code, calculate what the *ambient*, *diffuse*, and *specular* 
 		// components are. Then, accumulate that result on the *result_color* object.
 
+		auto l = (light.position - point).normalized();
+		auto v = (eye_pos - point).normalized();
+		auto h = (l + v).normalized();
+		auto rr = (light.position - point).dot(light.position - point);
+
+		auto la = ka.cwiseProduct(amb_light_intensity);
+		auto ls = ks.cwiseProduct(light.intensity) / rr * pow(std::max(0.f, normal.dot(h)), p);
+		auto ld = kd.cwiseProduct(light.intensity) / rr * std::max(0.0f, normal.dot(l));
+
+		auto L = la + ls + ld;
+		result_color += L;
 	}
 
 	return result_color * 255.f;
@@ -311,10 +322,11 @@ int main(int argc, const char** argv)
 
 	rst::rasterizer r(700, 700);
 
-	auto texture_path = "hmap.jpg";
+	//auto texture_path = "hmap.jpg";
+	auto texture_path = "spot_texture.png";
 	r.set_texture(Texture(obj_path + texture_path));
 
-	std::function<Eigen::Vector3f(fragment_shader_payload)> active_shader = phong_fragment_shader;
+	std::function<Eigen::Vector3f(fragment_shader_payload)> active_shader = texture_fragment_shader;
 
 	if (argc >= 2)
 	{
