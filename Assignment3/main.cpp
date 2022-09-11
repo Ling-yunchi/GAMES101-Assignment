@@ -192,7 +192,7 @@ Eigen::Vector3f phong_fragment_shader(const fragment_shader_payload& payload)
 
 		auto la = ka.cwiseProduct(amb_light_intensity);
 		auto ls = ks.cwiseProduct(light.intensity) / rr * pow(std::max(0.f, normal.dot(h)), p);
-		auto ld = kd.cwiseProduct(light.intensity)/ rr * std::max(0.0f, normal.dot(l));
+		auto ld = kd.cwiseProduct(light.intensity) / rr * std::max(0.0f, normal.dot(l));
 
 		auto L = la + ls + ld;
 		result_color += L;
@@ -238,16 +238,39 @@ Eigen::Vector3f displacement_fragment_shader(const fragment_shader_payload& payl
 	// Normal n = normalize(TBN * ln)
 
 	auto n = normal;
-	auto t = Eigen::Vector3f(n.x() * n.y() / sqrt(n.x() * n.x() + n.z() * n.z()), sqrt(n.x() * n.x() + n.z() * n.z()), n.z() * n.y() / sqrt(n.x() * n.x() + n.z() * n.z()));
+	auto x = n.x();
+	auto y = n.y();
+	auto z = n.z();
+
+	auto t = Eigen::Vector3f(
+		x * y / sqrt(x * x + z * z),
+		sqrt(x * x + z * z),
+		z * y / sqrt(x * x + z * z)
+	);
 	auto b = n.cross(t);
+
 	Eigen::Matrix3f TBN;
 	TBN << t, b, n;
-	auto dU = kh * kn * (payload.texture->getColor(payload.tex_coords.x() + 1.0f / payload.texture->width, payload.tex_coords.y()).norm() - payload.texture->getColor(payload.tex_coords.x(), payload.tex_coords.y()).norm());
-	auto dV = kh * kn * (payload.texture->getColor(payload.tex_coords.x(), payload.tex_coords.y() + 1.0f / payload.texture->height).norm() - payload.texture->getColor(payload.tex_coords.x(), payload.tex_coords.y()).norm());
-	auto ln = Eigen::Vector3f(-dU, -dV, 1);
-	point = point + kn * n.cwiseProduct(payload.texture->getColor(payload.tex_coords.x(), payload.tex_coords.y()));
+
+	auto u = payload.tex_coords.x();
+	auto v = payload.tex_coords.y();
+	auto w = payload.texture->width;
+	auto h = payload.texture->height;
+
+	auto dU = kh * kn * (
+		payload.texture->getColor(u + 1.0f / w, v).norm() -
+		payload.texture->getColor(u, v).norm()
+		);
+	auto dV = kh * kn * (
+		payload.texture->getColor(u, v + 1.0f / h).norm() -
+		payload.texture->getColor(u, v).norm()
+		);
+
+	auto ln = Eigen::Vector3f(-dU, -dV, 1.0f);
+
+	point += kn * n * payload.texture->getColor(u, v).norm();
 	normal = (TBN * ln).normalized();
-	
+
 
 	Eigen::Vector3f result_color = { 0, 0, 0 };
 
@@ -307,14 +330,37 @@ Eigen::Vector3f bump_fragment_shader(const fragment_shader_payload& payload)
 	// Normal n = normalize(TBN * ln)
 
 	auto n = normal;
-	auto t = Eigen::Vector3f(n.x() * n.y() / sqrt(n.x() * n.x() + n.z() * n.z()), sqrt(n.x() * n.x() + n.z() * n.z()), n.z() * n.y() / sqrt(n.x() * n.x() + n.z() * n.z()));
+	auto x = n.x();
+	auto y = n.y();
+	auto z = n.z();
+	
+	auto t = Eigen::Vector3f(
+		x * y / sqrt(x * x + z * z),
+		sqrt(x * x + z * z),
+		z * y / sqrt(x * x + z * z)
+	);
 	auto b = n.cross(t);
+
 	Eigen::Matrix3f TBN;
 	TBN << t, b, n;
-	auto dU = kh * kn * (payload.texture->getColor(payload.tex_coords.x() + 1.0f / payload.texture->width, payload.tex_coords.y()).norm() - payload.texture->getColor(payload.tex_coords.x(), payload.tex_coords.y()).norm());
-	auto dV = kh * kn * (payload.texture->getColor(payload.tex_coords.x(), payload.tex_coords.y() + 1.0f / payload.texture->height).norm() - payload.texture->getColor(payload.tex_coords.x(), payload.tex_coords.y()).norm());
-	auto ln = Eigen::Vector3f(-dU, -dV, 1);
-	point = point + kn * n.cwiseProduct(payload.texture->getColor(payload.tex_coords.x(), payload.tex_coords.y()));
+	
+	auto u = payload.tex_coords.x();
+	auto v = payload.tex_coords.y();
+	auto w = payload.texture->width;
+	auto h = payload.texture->height;
+
+	auto dU = kh * kn * (
+		payload.texture->getColor(u + 1.0f / w, v).norm() -
+		payload.texture->getColor(u,v).norm()
+		);
+	auto dV = kh * kn * (
+		payload.texture->getColor(u, v + 1.0f / h).norm() -
+		payload.texture->getColor(u, v).norm()
+		);
+	
+	auto ln = Eigen::Vector3f(-dU, -dV, 1.0f);
+	
+	point += kn * n * payload.texture->getColor(u, v).norm();
 	normal = (TBN * ln).normalized();
 
 
@@ -358,7 +404,7 @@ int main(int argc, const char** argv)
 	//auto texture_path = "spot_texture.png";
 	r.set_texture(Texture(obj_path + texture_path));
 
-	std::function<Eigen::Vector3f(fragment_shader_payload)> active_shader = bump_fragment_shader;
+	std::function<Eigen::Vector3f(fragment_shader_payload)> active_shader = displacement_fragment_shader;
 
 	if (argc >= 2)
 	{
