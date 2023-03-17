@@ -404,7 +404,7 @@ int main(int argc, const char** argv)
 	//auto texture_path = "spot_texture.png";
 	r.set_texture(Texture(obj_path + texture_path));
 
-	std::function<Eigen::Vector3f(fragment_shader_payload)> active_shader = displacement_fragment_shader;
+	std::function<Eigen::Vector3f(fragment_shader_payload)> active_shader = phong_fragment_shader;
 
 	if (argc >= 2)
 	{
