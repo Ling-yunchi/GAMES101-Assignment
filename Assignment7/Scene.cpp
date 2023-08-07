@@ -61,4 +61,56 @@ bool Scene::trace(
 Vector3f Scene::castRay(const Ray& ray, int depth) const
 {
 	// TO DO Implement Path Tracing Algorithm here
+
+	// intersect wiht scene 
+	auto inter = intersect(ray);
+	if (!inter.happened) {
+		return { 0,0,0 };
+	}
+
+	Vector3f L_dir(0);
+
+	// uniformly sample the light
+	Intersection light_inter;
+	float light_pdf;
+	sampleLight(light_inter, light_pdf);
+
+	auto l2p = inter.coords - light_inter.coords;
+	Ray light_ray(light_inter.coords, l2p.normalized());
+	auto light_ray_inter = intersect(light_ray);
+	if (light_ray_inter.obj == inter.obj) {
+		// not blocked in the middle
+		auto in_light_dir = -light_ray.direction;
+		auto out_dir = -ray.direction;
+		auto dis2 = light_ray_inter.distance * light_ray_inter.distance;
+
+		L_dir = light_inter.emit
+			* inter.m->eval(in_light_dir, out_dir, inter.normal)
+			* dotProduct(in_light_dir, inter.normal)
+			* dotProduct(-in_light_dir, light_inter.normal)
+			/ dis2
+			/ light_pdf
+			+ inter.m->getEmission();
+	}
+
+	Vector3f L_indir(0);
+	// judge to continue trace, 1/2
+	if (get_random_float() < 0.5) {
+		auto mat = inter.m;
+		auto out_dir = mat->sample(ray.direction, inter.normal);
+		auto pdf = mat->pdf(-ray.direction, out_dir, inter.normal);
+
+		Ray reflect_ray(inter.coords, out_dir);
+		auto reflect_inter = intersect(reflect_ray);
+
+		if (reflect_inter.happened && !reflect_inter.obj->hasEmit()) {
+			L_indir = castRay(reflect_ray, depth + 1)
+				* mat->eval(-ray.direction, out_dir, inter.normal)
+				* dotProduct(out_dir, inter.normal)
+				/ pdf
+				/ 0.5;
+		}
+	}
+
+	return L_dir + L_indir;
 }
