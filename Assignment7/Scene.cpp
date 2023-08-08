@@ -70,6 +70,10 @@ Vector3f Scene::castRay(const Ray& ray, int depth) const
 
 	Vector3f L_dir(0);
 
+	if (inter.obj->hasEmit()) {
+		L_dir += inter.m->getEmission();
+	}
+
 	// uniformly sample the light
 	Intersection light_inter;
 	float light_pdf;
@@ -84,18 +88,18 @@ Vector3f Scene::castRay(const Ray& ray, int depth) const
 		auto out_dir = -ray.direction;
 		auto dis2 = light_ray_inter.distance * light_ray_inter.distance;
 
-		L_dir = light_inter.emit
+		L_dir += light_inter.emit
 			* inter.m->eval(in_light_dir, out_dir, inter.normal)
 			* dotProduct(in_light_dir, inter.normal)
 			* dotProduct(-in_light_dir, light_inter.normal)
 			/ dis2
-			/ light_pdf
-			+ inter.m->getEmission();
+			/ light_pdf;
 	}
 
 	Vector3f L_indir(0);
-	// judge to continue trace, 1/2
-	if (get_random_float() < 0.5) {
+	// judge to continue trace, 3/4
+	constexpr float russian_roulette = 0.75f;
+	if (depth < 30 && get_random_float() < russian_roulette) {
 		auto mat = inter.m;
 		auto out_dir = mat->sample(ray.direction, inter.normal);
 		auto pdf = mat->pdf(-ray.direction, out_dir, inter.normal);
@@ -104,11 +108,11 @@ Vector3f Scene::castRay(const Ray& ray, int depth) const
 		auto reflect_inter = intersect(reflect_ray);
 
 		if (reflect_inter.happened && !reflect_inter.obj->hasEmit()) {
-			L_indir = castRay(reflect_ray, depth + 1)
+			L_indir += castRay(reflect_ray, depth + 1)
 				* mat->eval(-ray.direction, out_dir, inter.normal)
 				* dotProduct(out_dir, inter.normal)
 				/ pdf
-				/ 0.5;
+				/ russian_roulette;
 		}
 	}
 

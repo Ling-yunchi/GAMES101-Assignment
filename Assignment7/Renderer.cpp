@@ -6,6 +6,8 @@
 #include "Scene.hpp"
 #include "Renderer.hpp"
 
+#include "thread_pool.hpp"
+
 
 inline float deg2rad(const float& deg) { return deg * M_PI / 180.0; }
 
@@ -24,8 +26,14 @@ void Renderer::Render(const Scene& scene)
 	int m = 0;
 
 	// change the spp value to change sample ammount
-	int spp = 16;
+	int spp = 128;
 	std::cout << "SPP: " << spp << "\n";
+	thread_pool pool(8);
+	std::mutex progress_mutex; // 用于保护进度更新操作
+	float progress = 0.0f;
+	const float progress_increment = 1.0f / (scene.height * scene.width);
+
+	UpdateProgress(progress);
 	for (uint32_t j = 0; j < scene.height; ++j) {
 		for (uint32_t i = 0; i < scene.width; ++i) {
 			// generate primary ray direction
@@ -34,14 +42,23 @@ void Renderer::Render(const Scene& scene)
 			float y = (1 - 2 * (j + 0.5) / (float)scene.height) * scale;
 
 			Vector3f dir = normalize(Vector3f(-x, y, 1));
-			for (int k = 0; k < spp; k++) {
-				framebuffer[m] += scene.castRay(Ray(eye_pos, dir), 0) / spp;
-			}
+
+			pool.add_task([&, m, dir] {
+				for (int k = 0; k < spp; k++) {
+					framebuffer[m] += scene.castRay(Ray(eye_pos, dir), 0) / spp;
+				}
+
+				std::lock_guard lock(progress_mutex);
+				const int progress_int = static_cast<int>(progress * 100);
+				progress += progress_increment;
+				if (static_cast<int>(progress * 100) > progress_int)
+					UpdateProgress(progress);
+			});
 			m++;
 		}
-		UpdateProgress(j / (float)scene.height);
 	}
-	UpdateProgress(1.f);
+	pool.wait();
+	UpdateProgress(1.0f);
 
 	// save framebuffer to file
 	FILE* fp = fopen("binary.ppm", "wb");
